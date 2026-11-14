@@ -1,0 +1,284 @@
+/* Design tokens (Tailwind v4). Import after `@import "tailwindcss";` */
+/* PHĐ Kit tokens — nhận diện PHĐ Technology (phdgroup.vn). Màu lấy từ logo: navy #003078 → blue #0050A8 → green #087830,
+ * tương ứng ba chữ P – H – Đ (slogan Phục vụ – Hiện đại – Đổi mới).
+ * --brand-* là màu logo gốc; --primary dùng blue #0050A8 (nút, liên kết, tab đang chọn), tiêu đề dùng navy.
+ * Menu bên là dải gradient dọc blue → navy → xanh lá đậm, giống dải gradient của logo. Mọi cặp chữ/nền đạt WCAG AA. */
+:root {
+  --radius: 0.5rem;
+  --brand-navy: #003078;
+  --brand-blue: #0050a8;
+  --brand-orange: #003078; /* giữ tên cũ cho tương thích, PHĐ không có màu cam: trỏ về navy */
+  --brand-green: #087830;
+  --brand-gradient: linear-gradient(100deg, #003078 0%, #0050a8 48%, #087830 100%);
+  --background: #fff;
+  --foreground: #0f172a;
+  --card: #fff;
+  --card-foreground: #0f172a;
+  --popover: #fff;
+  --popover-foreground: #0f172a;
+  --primary: #0050a8;
+  --primary-foreground: #fff;
+  --secondary: #f3f5f8;
+  --secondary-foreground: #0f172a;
+  --muted: #eef1f5;
+  --muted-foreground: #475569;
+  --subtle-foreground: #636f80;
+  --frame: #f8f9fa;
+  --border-strong: #c5cdd8;
+  --accent: #eef4fc;
+  --accent-foreground: #003078;
+  --destructive: #c9302c;
+  --destructive-foreground: #fff;
+  --warning: #9a5a06;
+  --warning-foreground: #fff;
+  --success: #087830;
+  --success-foreground: #fff;
+  --info: #0a63c4;
+  --info-foreground: #fff;
+  --border: #e2e7ee;
+  --input: #929dad;
+  /* Rest border of text fields: soft like --border-strong so a form does not read as black boxes next to cards.
+   * Hover darkens to --input, focus turns --primary with the soft halo below. */
+  --field-border: #cbd3dd;
+  --ring: #0050a8;
+  --sidebar: #003078;
+  --sidebar-from: #0050a8;
+  --sidebar-to: #054a2c;
+  --sidebar-foreground: #dbe8f7;
+  --sidebar-primary: #002356;
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #003078;
+  --sidebar-border: #ffffff14;
+  --sidebar-ring: #ffffff;
+  --chart-1: #0050a8;
+  --chart-2: #3d8be0;
+  --chart-3: #087830;
+  --chart-4: #7b5bd6;
+  --chart-5: #d9453c;
+  --page-from: #f8f9fa;
+  --page-to: #f8f9fa;
+  --shadow-sm: 0 1px 2px #0f172a0d, 0 1px 1px #0f172a08;
+  --shadow-lg: 0 16px 36px -12px #00307829, 0 4px 10px -4px #0f172a14;
+  /* Text-field focus: a 3px tinted halo around the --primary border (the solid --shadow-focus ring stays on buttons and selection controls) */
+  --shadow-focus-soft: 0 0 0 3px color-mix(in oklab, var(--ring) 22%, transparent);
+  --shadow-focus-soft-danger: 0 0 0 3px color-mix(in oklab, var(--destructive) 18%, transparent);
+}
+
+.dark {
+  --background: #0a111b;
+  --foreground: #e6ecf4;
+  --card: #0f1824;
+  --card-foreground: #e6ecf4;
+  --popover: #121c2a;
+  --popover-foreground: #e6ecf4;
+  --primary: #6ba9ea;
+  --primary-foreground: #03172b;
+  --secondary: #172231;
+  --secondary-foreground: #e6ecf4;
+  --muted: #151f2d;
+  --muted-foreground: #97a4b6;
+  --subtle-foreground: #8795a8;
+  --frame: #0c141f;
+  --border-strong: #354559;
+  --accent: #132739;
+  --accent-foreground: #cfe6f8;
+  --destructive: #ef6a5f;
+  --destructive-foreground: #1f0604;
+  --warning: #f0a54a;
+  --warning-foreground: #221302;
+  --success: #4cc274;
+  --success-foreground: #04200c;
+  --info: #6eaaf5;
+  --info-foreground: #04172b;
+  --border: #1f2b3b;
+  --input: #56667b;
+  --field-border: #3b4a5d;
+  --ring: #6ba9ea;
+  --sidebar: #04204f;
+  --sidebar-from: #0a3570;
+  --sidebar-to: #04301c;
+  --sidebar-foreground: #c2d3e8;
+  --sidebar-primary: #002356;
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: #1d4a80;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: #ffffff14;
+  --sidebar-ring: #8fb3e4;
+  --chart-1: #6ba9ea;
+  --chart-2: #8fbcf0;
+  --chart-3: #35b45c;
+  --chart-4: #a98ff0;
+  --chart-5: #ef6a5f;
+  --page-from: #0b1420;
+  --page-to: #0a111b;
+  --shadow-sm: 0 1px 2px #0000004d;
+  --shadow-lg: 0 18px 40px -12px #000000a6, 0 4px 10px -4px #00000066;
+  --shadow-focus-soft: 0 0 0 3px color-mix(in oklab, var(--ring) 35%, transparent);
+  --shadow-focus-soft-danger: 0 0 0 3px color-mix(in oklab, var(--destructive) 30%, transparent);
+}
+
+@custom-variant dark (&:where(.dark, .dark *));
+/* Touch devices: use `coarse:` to enlarge hit areas without changing the desktop density */
+@custom-variant coarse (@media (pointer: coarse));
+
+@theme inline {
+  --font-sans: "Roboto", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", SFMono-Regular, Consolas, monospace;
+  /* Radii grow with the size of the surface: chips 6px, controls 8px, panels 12px, cards 16px */
+  /* Type scale: 8 distinct sizes (11 12 13 14 15 17 22 34). Several names alias one size so existing
+   * class names keep working; prefer micro / meta / body / base / lead / title / heading / display. */
+  /* Floor is 11px (uppercase labels only); body-level text starts at 12px */
+  --text-micro: 11px;
+  --text-tiny: 12px;
+  --text-caption: 12px;
+  --text-label: 12px;
+  --text-meta: 12px;
+  --text-small: 13px;
+  --text-body: 13px;
+  --text-control: 14px;
+  --text-base: 14px;
+  --text-emph: 15px;
+  --text-lead: 15px;
+  --text-title: 17px;
+  --text-heading: 22px;
+  --text-display: 34px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-orange: var(--brand-orange);
+  --color-brand-green: var(--brand-green);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-subtle-foreground: var(--subtle-foreground);
+  --color-frame: var(--frame);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-field-border: var(--field-border);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-from: var(--sidebar-from);
+  --color-sidebar-to: var(--sidebar-to);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --shadow-sm: var(--shadow-sm);
+  --shadow-lg: var(--shadow-lg);
+  --shadow-focus-soft: var(--shadow-focus-soft);
+  --shadow-focus-soft-danger: var(--shadow-focus-soft-danger);
+  /* Focus indicator: 2px gap in the surface colour + 2px solid ring (>= 3:1 on every surface, WCAG 2.4.11) */
+  --shadow-focus: 0 0 0 2px var(--background), 0 0 0 4px var(--ring);
+}
+
+/* Page background of the app shell: a barely-there cool wash behind the white surfaces */
+@utility bg-page { background-image: linear-gradient(45deg, var(--page-from), var(--page-to)); }
+
+/* Side menu surface: vertical wash from --sidebar-from through --sidebar to --sidebar-to (text tokens are checked against all three). */
+@utility bg-sidebar-gradient { background-color: var(--sidebar); background-image: linear-gradient(180deg, var(--sidebar-from) 0%, var(--sidebar) 55%, var(--sidebar-to) 100%); }
+
+/* Global stacking scale. Component-internal layering keeps small numbers (z-1…z-20); anything that
+ * must sit above page content uses a named layer so popups never hide behind app chrome. */
+/* Gradient thương hiệu PHĐ (navy → blue → green, 100°) cho nút CTA, dải kêu gọi hành động, ô icon. */
+@utility bg-brand-gradient { background-color: var(--brand-blue); background-image: var(--brand-gradient); }
+@utility text-brand-gradient { background-image: var(--brand-gradient); -webkit-background-clip: text; background-clip: text; color: transparent; }
+@utility z-chrome { z-index: 30; }
+@utility z-chrome-top { z-index: 31; }
+@utility z-fixed { z-index: 40; }
+@utility z-overlay { z-index: 50; }
+@utility z-tooltip { z-index: 60; }
+
+/* Overlay motion. Radix keeps a closing layer mounted until its exit animation ends, so every layer gets an
+ * enter (`[data-state=open]`) and a faster exit (`[data-state=closed]`). Self-contained: no tw-animate-css needed.
+ *   anim-fade   backdrops          anim-pop    centred dialogs (scale + fade)
+ *   anim-popup  anchored popups (popover, menus, select, tooltip: grows from the trigger, nudged by data-side)
+ *   anim-slide-{right,left,top,bottom}  side sheets. Reduced motion falls back to a plain fade. */
+:root {
+  --anim-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --anim-ease-in: cubic-bezier(0.4, 0, 0.7, 0.2);
+  --anim-ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+}
+@keyframes phd-fade-in { from { opacity: 0; } }
+@keyframes phd-fade-out { to { opacity: 0; } }
+@keyframes phd-pop-in { from { opacity: 0; scale: 0.96; } }
+@keyframes phd-pop-out { to { opacity: 0; scale: 0.97; } }
+@keyframes phd-popup-in { from { opacity: 0; scale: 0.96; translate: var(--phd-x, 0) var(--phd-y, 0); } }
+@keyframes phd-popup-out { to { opacity: 0; scale: 0.97; translate: var(--phd-x, 0) var(--phd-y, 0); } }
+@keyframes phd-slide-in { from { translate: var(--phd-x, 0) var(--phd-y, 0); } }
+@keyframes phd-slide-out { to { translate: var(--phd-x, 0) var(--phd-y, 0); } }
+
+@utility anim-fade {
+  &[data-state="open"] { animation: phd-fade-in 200ms var(--anim-ease-out) both; }
+  &[data-state="closed"] { animation: phd-fade-out 220ms var(--anim-ease-in) both; }
+}
+@utility anim-pop {
+  &[data-state="open"] { animation: phd-pop-in 200ms var(--anim-ease-out) both; }
+  &[data-state="closed"] { animation: phd-pop-out 200ms var(--anim-ease-in) both; }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-state="open"] { animation-name: phd-fade-in; }
+    &[data-state="closed"] { animation-name: phd-fade-out; }
+  }
+}
+@utility anim-popup {
+  transform-origin: var(--radix-popover-content-transform-origin, var(--radix-dropdown-menu-content-transform-origin, var(--radix-context-menu-content-transform-origin, var(--radix-menubar-content-transform-origin, var(--radix-select-content-transform-origin, var(--radix-hover-card-content-transform-origin, var(--radix-tooltip-content-transform-origin, center)))))));
+  &[data-side="top"] { --phd-y: 4px; }
+  &[data-side="bottom"] { --phd-y: -4px; }
+  &[data-side="left"] { --phd-x: 4px; }
+  &[data-side="right"] { --phd-x: -4px; }
+  &[data-state="open"], &[data-state="delayed-open"], &[data-state="instant-open"] { animation: phd-popup-in 160ms var(--anim-ease-out) both; }
+  &[data-state="closed"] { animation: phd-popup-out 150ms var(--anim-ease-in) both; }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-state="open"], &[data-state="delayed-open"], &[data-state="instant-open"] { animation-name: phd-fade-in; }
+    &[data-state="closed"] { animation-name: phd-fade-out; }
+  }
+}
+@utility anim-slide-right { --phd-x: 100%; }
+@utility anim-slide-left { --phd-x: -100%; }
+@utility anim-slide-top { --phd-y: -100%; }
+@utility anim-slide-bottom { --phd-y: 100%; }
+@utility anim-slide {
+  &[data-state="open"] { animation: phd-slide-in 320ms var(--anim-ease-sheet) both; }
+  &[data-state="closed"] { animation: phd-slide-out 280ms var(--anim-ease-in) both; }
+  @media (prefers-reduced-motion: reduce) {
+    &[data-state="open"] { animation-name: phd-fade-in; }
+    &[data-state="closed"] { animation-name: phd-fade-out; }
+  }
+}
+
+@layer base {
+  * { border-color: var(--border); }
+  body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  ::selection { background: color-mix(in srgb, var(--primary) 22%, transparent); }
+}
