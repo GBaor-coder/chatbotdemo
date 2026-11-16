@@ -1,153 +1,213 @@
 using BackendDotnet.Models;
 using Dapper;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using Polly;
+using Polly.Retry;
 
 namespace BackendDotnet.Services;
-
-public sealed class RagPayload
-{
-    [JsonPropertyName("message")]
-    public string Message { get; set; } = string.Empty;
-    [JsonPropertyName("session_id")]
-    public string? SessionId { get; set; }
-    [JsonPropertyName("user_id")]
-    public string UserId { get; set; } = "anonymous";
-}
-
-public sealed class RagTokenEvent
-{
-    [JsonPropertyName("type")]
-    public string Type { get; set; } = string.Empty;
-    [JsonPropertyName("content")]
-    public string Content { get; set; } = string.Empty;
-    [JsonPropertyName("sources")]
-    public List<object>? Sources { get; set; }
-    [JsonPropertyName("session_id")]
-    public string? SessionId { get; set; }
-}
 
 public sealed class ChatService
 {
     private readonly IDbConnectionFactory _db;
+    private readonly ITenantContext _tenant;
+    private readonly IRetrievalClient _retrieval;
+    private readonly ILlmClient _llm;
+    private readonly IGuardrail _guardrail;
+    private readonly IPromptBuilder _promptBuilder;
+    private readonly IStructuredQueryService _structured;
+    private readonly IConfiguration _config;
     private readonly IHttpClientFactory _http;
 
-    public ChatService(IDbConnectionFactory db, IHttpClientFactory http)
+    private static readonly AsyncRetryPolicy PythonRetryPolicy =
+        Policy.Handle<Exception>()
+            .WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromMilliseconds(500 * retryAttempt));
+
+    public ChatService(
+        IDbConnectionFactory db,
+        ITenantContext tenant,
+        IRetrievalClient retrieval,
+        ILlmClient llm,
+        IGuardrail guardrail,
+        IPromptBuilder promptBuilder,
+        IStructuredQueryService structured,
+        IConfiguration config,
+        IHttpClientFactory http)
     {
         _db = db;
+        _tenant = tenant;
+        _retrieval = retrieval;
+        _llm = llm;
+        _guardrail = guardrail;
+        _promptBuilder = promptBuilder;
+        _structured = structured;
+        _config = config;
         _http = http;
     }
 
-    public async Task<string> EnsureSessionAsync(string? sessionId, string userId, string title)
+    public async Task<string> EnsureSessionAsync(string? sessionId, string tenantId, string userId, string title)
     {
         using var conn = _db.CreateConnection();
         if (!string.IsNullOrEmpty(sessionId))
         {
-            var existing = await conn.QueryFirstOrDefaultAsync<ChatSession>(
-                "SELECT id, title, user_id AS UserId, created_at AS CreatedAt, updated_at AS UpdatedAt FROM chat_sessions WHERE id = @id::uuid AND deleted_at IS NULL",
+            var existing = await conn.QueryFirstOrDefaultAsync<ChatSessionDto>(
+                "SELECT id, title, tenant_id AS TenantId, user_id AS UserId, created_at AS CreatedAt, updated_at AS UpdatedAt FROM chat_sessions WHERE id = @id::uuid AND deleted_at IS NULL",
                 new { id = sessionId });
             if (existing != null) return existing.Id;
         }
 
         var id = Guid.NewGuid().ToString();
         await conn.ExecuteAsync(
-            "INSERT INTO chat_sessions (id, user_id, title, created_at, updated_at) VALUES (@id::uuid, @userId, @title, NOW(), NOW())",
-            new { id, userId, title });
+            "INSERT INTO chat_sessions (id, tenant_id, user_id, title, created_at, updated_at) VALUES (@id::uuid, @tenantId::uuid, @userId, @title, NOW(), NOW())",
+            new { id, tenantId, userId, title });
         return id;
     }
 
-    public async Task SaveMessageAsync(string sessionId, string role, string content, string? metadataJson = null)
+    public async Task SaveMessageAsync(string sessionId, string role, string content, List<object>? sources = null, string? metadataJson = null)
     {
         using var conn = _db.CreateConnection();
+        var citationsJson = sources != null ? JsonSerializer.Serialize(sources) : "[]";
         await conn.ExecuteAsync(
-            "INSERT INTO chat_messages (id, session_id, role, content, metadata, created_at) VALUES (@id::uuid, @sessionId::uuid, @role, @content, @metadata::jsonb, NOW())",
-            new { id = Guid.NewGuid().ToString(), sessionId, role, content, metadata = metadataJson });
+            "INSERT INTO chat_messages (id, session_id, role, content, citations, metadata, created_at) VALUES (@id::uuid, @sessionId::uuid, @role, @content, @citations::jsonb, @metadata::jsonb, NOW())",
+            new { id = Guid.NewGuid().ToString(), sessionId, role, content, citations = citationsJson, metadata = metadataJson ?? "{}" });
     }
 
-    public async IAsyncEnumerable<StreamChunk> StreamFromAiServiceAsync(string message, string? sessionId, string userId)
+    public async IAsyncEnumerable<StreamEvent> StreamChatAsync(
+        string message,
+        string? sessionId,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
     {
-        var client = _http.CreateClient();
-        var resolvedSessionId = await EnsureSessionAsync(sessionId, userId, message.Length > 60 ? message[..60] : message);
+        var ctx = _tenant.GetContext();
+        if (string.IsNullOrEmpty(ctx.TenantId))
+        {
+            yield return new StreamEvent { Type = "error", Error = "Không xác định được phạm vi dữ liệu (tenant)." };
+            yield break;
+        }
 
+        var resolvedSessionId = await EnsureSessionAsync(sessionId, ctx.TenantId, ctx.UserId, message.Length > 60 ? message[..60] : message);
         await SaveMessageAsync(resolvedSessionId, "user", message);
 
-        var aiServiceUrl = Environment.GetEnvironmentVariable("AI_SERVICE_URL") ?? "http://ai-service:8000";
-        var payload = new RagPayload { Message = message, SessionId = resolvedSessionId, UserId = userId };
-        var json = JsonSerializer.Serialize(payload);
-
-        using var req = new HttpRequestMessage(HttpMethod.Post, $"{aiServiceUrl}/rag/stream")
+        // Bước 1: Structured query trước
+        StructuredResult? structuredResult = null;
+        try
         {
-            Content = new StringContent(json, System.Text.Encoding.UTF8, "application/json")
-        };
+            structuredResult = await _structured.QueryAsync(message, ctx.TenantId, ct);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine($"Structured query error: {ex.Message}");
+        }
 
-        using var resp = await client.SendAsync(req, HttpCompletionOption.ResponseHeadersRead);
-        resp.EnsureSuccessStatusCode();
+        // Bước 2: Semantic retrieval qua Python
+        List<ChunkResult> chunks = new();
+        string? retrievalError = null;
+        try
+        {
+            var filters = new Dictionary<string, object>();
+            var retrievalResult = await PythonRetryPolicy.ExecuteAsync(async () =>
+                await _retrieval.SearchAsync(message, ctx.TenantId, 5, 0.3, filters, ct));
+            chunks = retrievalResult.Results;
+        }
+        catch (Exception ex)
+        {
+            retrievalError = ex.Message;
+        }
 
+        if (retrievalError != null)
+        {
+            yield return new StreamEvent { Type = "error", Error = $"Lỗi truy xuất ngữ cảnh: {retrievalError}" };
+            yield break;
+        }
+
+        // Bước 3: Guardrail
+        var shouldRefuse = _guardrail.ShouldRefuse(chunks, structuredResult ?? new StructuredResult { HasResult = false });
+        if (shouldRefuse)
+        {
+            var refusal = _guardrail.GetRefusalMessage();
+            yield return new StreamEvent { Type = "token", Content = refusal };
+            yield return new StreamEvent { Type = "citations", Sources = new List<object>() };
+            yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId };
+            await SaveMessageAsync(resolvedSessionId, "assistant", refusal, new List<object>());
+            yield break;
+        }
+
+        // Bước 4: Dựng prompt và gọi LLM stream
+        var prompt = _promptBuilder.Build(message, chunks, structuredResult);
         var fullAnswer = "";
-        List<object> sources = new();
-
-        await using var stream = await resp.Content.ReadAsStreamAsync();
-        using var reader = new StreamReader(stream);
-        string? line;
-        while ((line = await reader.ReadLineAsync()) != null)
+        var citations = chunks.Select(c => new
         {
-            if (line.StartsWith("data: "))
+            id = c.ChunkId,
+            title = c.Metadata.TryGetValue("title", out var t) ? t?.ToString() : c.ChunkId,
+            source = c.Metadata.TryGetValue("source", out var s) ? s?.ToString() : "",
+            score = c.Score,
+        }).ToList<object>();
+
+        string? llmError = null;
+        var cancelled = false;
+
+        IAsyncEnumerable<string>? tokenStream = null;
+        try
+        {
+            tokenStream = _llm.StreamCompletionAsync(prompt, ct);
+        }
+        catch (Exception ex)
+        {
+            llmError = ex.Message;
+        }
+
+        if (llmError == null && tokenStream != null)
+        {
+            await foreach (var token in tokenStream)
             {
-                var payloadJson = line[6..];
-                RagTokenEvent? evt;
-                try
+                if (ct.IsCancellationRequested)
                 {
-                    evt = JsonSerializer.Deserialize<RagTokenEvent>(payloadJson);
+                    cancelled = true;
+                    break;
                 }
-                catch
-                {
-                    continue;
-                }
-
-                if (evt == null) continue;
-
-                switch (evt.Type)
-                {
-                    case "token":
-                        fullAnswer += evt.Content;
-                        yield return new StreamChunk
-                        {
-                            Type = "token",
-                            Content = evt.Content,
-                            SessionId = resolvedSessionId
-                        };
-                        break;
-                    case "citations":
-                        sources = evt.Sources ?? new List<object>();
-                        yield return new StreamChunk
-                        {
-                            Type = "citations",
-                            Sources = sources,
-                            SessionId = resolvedSessionId
-                        };
-                        break;
-                    case "done":
-                        yield return new StreamChunk
-                        {
-                            Type = "done",
-                            Done = true,
-                            SessionId = evt.SessionId ?? resolvedSessionId
-                        };
-                        break;
-                    case "error":
-                        yield return new StreamChunk
-                        {
-                            Type = "error",
-                            Error = evt.Content,
-                            SessionId = resolvedSessionId
-                        };
-                        break;
-                }
+                fullAnswer += token;
+                yield return new StreamEvent { Type = "token", Content = token, SessionId = resolvedSessionId };
             }
         }
 
-        // Lưu câu trả lời hoàn chỉnh của bot vào DB
-        var metadata = JsonSerializer.Serialize(new { sources });
-        await SaveMessageAsync(resolvedSessionId, "assistant", fullAnswer, metadata);
+        if (cancelled)
+        {
+            yield break;
+        }
+
+        if (llmError != null)
+        {
+            yield return new StreamEvent { Type = "error", Error = $"Lỗi LLM: {llmError}" };
+            yield break;
+        }
+
+        yield return new StreamEvent { Type = "citations", Sources = citations, SessionId = resolvedSessionId };
+        yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId };
+
+        var metadata = JsonSerializer.Serialize(new { sources = citations });
+        await SaveMessageAsync(resolvedSessionId, "assistant", fullAnswer, citations, metadata);
     }
+
+    public async Task<List<ChatMessageDto>> GetHistoryAsync(string sessionId, string tenantId)
+    {
+        using var conn = _db.CreateConnection();
+        var owner = await conn.QueryFirstOrDefaultAsync<int?>(
+            "SELECT 1 FROM chat_sessions WHERE id = @sid::uuid AND tenant_id = @tid::uuid AND deleted_at IS NULL",
+            new { sid = sessionId, tid = tenantId });
+        if (owner == null)
+            return new List<ChatMessageDto>();
+
+        var rows = await conn.QueryAsync<ChatMessageDto>(
+            "SELECT id, session_id AS SessionId, role, content, metadata AS Metadata, created_at AS CreatedAt FROM chat_messages WHERE session_id = @sid::uuid AND deleted_at IS NULL ORDER BY created_at ASC",
+            new { sid = sessionId });
+        return rows.ToList();
+    }
+}
+
+public sealed class ChatSessionDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
+    public string TenantId { get; set; } = string.Empty;
+    public string UserId { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+    public DateTime UpdatedAt { get; set; }
 }

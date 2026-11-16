@@ -41,7 +41,6 @@ export function useChatStream() {
           body: JSON.stringify({
             message: text,
             sessionId: sessionId,
-            userId: "web-user",
           }),
         });
 
