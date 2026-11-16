@@ -3,8 +3,8 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    app_name: str = "ai-service"
-    app_version: str = "1.0.0"
+    app_name: str = "rag-data-service"
+    app_version: str = "2.0.0"
 
     postgres_user: str = Field(default="postgres", alias="POSTGRES_USER")
     postgres_password: str = Field(default="postgres", alias="POSTGRES_PASSWORD")
@@ -16,16 +16,9 @@ class Settings(BaseSettings):
 
     embedding_model: str = Field(default="BAAI/bge-m3", alias="EMBEDDING_MODEL")
     embedding_device: str = Field(default="cpu", alias="EMBEDDING_DEVICE")
+    embedding_batch_size: int = Field(default=32, alias="EMBEDDING_BATCH_SIZE")
 
-    llm_base_url: str = Field(
-        default="http://host.docker.internal:20128/v1", alias="LLM_BASE_URL"
-    )
-    llm_api_key: str = Field(
-        default="sk-57a432014c1cc01c-6juq1i-fe7dbfbd", alias="LLM_API_KEY"
-    )
-    llm_model: str = Field(default="chatbotai", alias="LLM_MODEL")
-
-    gateway_url: str = Field(default="http://backend-dotnet:5000", alias="GATEWAY_URL")
+    x_internal_api_key: str = Field(default="dev-internal-key", alias="X_INTERNAL_API_KEY")
 
     log_level: str = Field(default="INFO", alias="LOG_LEVEL")
 
