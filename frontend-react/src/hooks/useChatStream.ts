@@ -37,7 +37,10 @@ export function useChatStream() {
       try {
         const res = await fetch("/api/chat/stream", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer dev-token",
+          },
           body: JSON.stringify({
             message: text,
             sessionId: sessionId,

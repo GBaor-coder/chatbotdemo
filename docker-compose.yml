@@ -54,6 +54,7 @@ services:
       LLM_BASE_URL: http://host.docker.internal:20128/v1
       LLM_MODEL: chatbotai
       GUARDRAIL_REFUSAL_MESSAGE: Xin lỗi, hiện tại tôi chỉ hỗ trợ giải đáp các thông tin liên quan đến tuyển sinh của Nhà trường dựa trên dữ liệu chính thức. Bạn vui lòng đặt câu hỏi về ngành học, điểm chuẩn, học phí hoặc phương thức xét tuyển nhé!
+      GUARDRAIL_MIN_SCORE: 0.45
       DEFAULT_TENANT_ID: 11111111-1111-1111-1111-111111111111
       ASPNETCORE_URLS: http://+:5000
     ports:

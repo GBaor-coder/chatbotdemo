@@ -127,7 +127,7 @@ class SearchFilters(BaseModel):
 
 class SearchRequest(BaseModel):
     query: str
-    top_k: int = Field(default=5, ge=1, le=20)
+    top_k: int = Field(default=5, ge=1)
     min_score: float = Field(default=0.0, ge=0.0, le=1.0)
     filters: SearchFilters
 
@@ -171,9 +171,9 @@ async def retrieval_search(req: SearchRequest, request: Request):
     try:
         validate_filters(filters)
     except ValueError as exc:
-        raise HTTPException(
+        return JSONResponse(
             status_code=422,
-            detail={
+            content={
                 "success": False,
                 "error": {"code": "validation_error", "message": str(exc)},
                 "request_id": request_id,
@@ -181,10 +181,11 @@ async def retrieval_search(req: SearchRequest, request: Request):
         )
 
     t2 = time.perf_counter()
+    clamped_top_k = min(max(req.top_k, 1), 20)
     results = search_similar_chunks(
         query_embedding=query_embedding,
         filters=filters,
-        top_k=req.top_k,
+        top_k=clamped_top_k,
         min_score=req.min_score,
     )
     t3 = time.perf_counter()

@@ -21,7 +21,7 @@ File `docker-compose.yml` hiện tại:
 ## Code hiện tại (trước khi sửa theo Phase 1-4)
 
 ### ai-service (Python FastAPI) — LÀM QUÁ NHIỀU VIỆC (vi phạm ranh giới)
-- `config.py`: có `LLM_BASE_URL`, `LLM_API_KEY` (plaintext `sk-57a432014c1cc01c-6juq1i-fe7dbfbd`), `LLM_MODEL`, `GATEWAY_URL`.
+- `config.py`: có `LLM_BASE_URL`, `LLM_API_KEY` (plaintext đã lộ), `LLM_MODEL`, `GATEWAY_URL`.
 - `requirements.txt`: có `openai==1.52.0`.
 - `main.py`: endpoint `/health`, `/ingest/seed`, `/rag/stream` (dùng OpenAI AsyncClient stream tokens, emit SSE `token/citations/done`, gọi `seed()` trên startup).
 - `rag_engine.py`: system prompt, `build_prompt`, `stream_llm_tokens` (gọi 9Router), `GUARDRAIL_REFUSAL` hard-code.
@@ -69,5 +69,5 @@ Tất cả 4 container healthy:
   - `history/{sessionId}` không kiểm tra quyền sở hữu (IDOR).
 
 ## Ghi chú
-- Key cũ `sk-57a432014c1cc01c-6juq1i-fe7dbfbd` đã lộ trong repo/lịch sử git → cần thu hồi.
+- Key cũ (đã lộ trong repo/lịch sử git) → cần thu hồi.
 - Ports 5432 và 8000 đang publish ra host trong docker-compose mặc định (phải bỏ, chỉ publish qua override dev).

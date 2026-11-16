@@ -23,15 +23,30 @@ public sealed class TenantContextProvider : ITenantContext
         {
             return new TenantContext
             {
-                TenantId = _config["DEFAULT_TENANT_ID"] ?? "11111111-1111-1111-1111-111111111111",
-                UserId = "dev-user",
+                TenantId = string.Empty,
+                UserId = string.Empty,
                 OrganizationIds = Array.Empty<string>(),
             };
         }
 
-        var tenantId = ctx.Request.Headers["X-Tenant-Id"].FirstOrDefault()
+        var authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
+        var xTenantId = ctx.Request.Headers["X-Tenant-Id"].FirstOrDefault();
+
+        // [GIẢ ĐỊNH] Dev auth: Yêu cầu Authorization header (hoặc X-Tenant-Id) để xác thực.
+        // Nếu không có cả hai -> coi như unauthenticated (trả TenantId rỗng để controller trả 401).
+        if (string.IsNullOrEmpty(authHeader) && string.IsNullOrEmpty(xTenantId))
+        {
+            return new TenantContext
+            {
+                TenantId = string.Empty,
+                UserId = string.Empty,
+                OrganizationIds = Array.Empty<string>(),
+            };
+        }
+
+        var tenantId = xTenantId
             ?? _config["DEFAULT_TENANT_ID"] ?? "11111111-1111-1111-1111-111111111111";
-        var userId = ctx.Request.Headers["X-User-Id"].FirstOrDefault() ?? "anonymous";
+        var userId = ctx.Request.Headers["X-User-Id"].FirstOrDefault() ?? "authenticated-user";
 
         return new TenantContext
         {

@@ -1,0 +1,21 @@
+services:
+  fake-llm:
+    build:
+      context: .
+      dockerfile: tests/fixtures/fake-llm/Dockerfile
+    image: fake-llm:test
+    ports:
+      - "20129:20128"
+    expose:
+      - "20128"
+
+  backend-dotnet:
+    environment:
+      LLM_BASE_URL: http://fake-llm:20128/v1
+    depends_on:
+      fake-llm:
+        condition: service_started
+
+  ai-service:
+    ports:
+      - "8000:8000"

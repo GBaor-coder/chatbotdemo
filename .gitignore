@@ -16,3 +16,5 @@ publish/
 coverage/
 bin/
 obj/
+tests/e2e/test-results/
+tests/e2e/playwright-report/

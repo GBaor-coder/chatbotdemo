@@ -11,12 +11,24 @@ namespace BackendDotnet.Controllers;
 public sealed class ChatController : ControllerBase
 {
     private readonly ChatService _chat;
+    private readonly ITenantContext _tenant;
 
-    public ChatController(ChatService chat) => _chat = chat;
+    public ChatController(ChatService chat, ITenantContext tenant)
+    {
+        _chat = chat;
+        _tenant = tenant;
+    }
 
     [HttpPost("stream")]
     public async Task Stream(CancellationToken ct)
     {
+        var ctx = _tenant.GetContext();
+        if (string.IsNullOrEmpty(ctx.TenantId))
+        {
+            Response.StatusCode = 401;
+            return;
+        }
+
         // Không đọc userId/tenantId từ body — lấy từ danh tính đã xác thực (header)
         using var reader = new StreamReader(Request.Body);
         var body = await reader.ReadToEndAsync();

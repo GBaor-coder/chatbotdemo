@@ -125,7 +125,7 @@ public sealed class ChatService
             var refusal = _guardrail.GetRefusalMessage();
             yield return new StreamEvent { Type = "token", Content = refusal };
             yield return new StreamEvent { Type = "citations", Sources = new List<object>() };
-            yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId };
+            yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId, Done = true };
             await SaveMessageAsync(resolvedSessionId, "assistant", refusal, new List<object>());
             yield break;
         }
@@ -180,7 +180,7 @@ public sealed class ChatService
         }
 
         yield return new StreamEvent { Type = "citations", Sources = citations, SessionId = resolvedSessionId };
-        yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId };
+        yield return new StreamEvent { Type = "done", SessionId = resolvedSessionId, Done = true };
 
         var metadata = JsonSerializer.Serialize(new { sources = citations });
         await SaveMessageAsync(resolvedSessionId, "assistant", fullAnswer, citations, metadata);
@@ -196,7 +196,7 @@ public sealed class ChatService
             return new List<ChatMessageDto>();
 
         var rows = await conn.QueryAsync<ChatMessageDto>(
-            "SELECT id, session_id AS SessionId, role, content, metadata AS Metadata, created_at AS CreatedAt FROM chat_messages WHERE session_id = @sid::uuid AND deleted_at IS NULL ORDER BY created_at ASC",
+            "SELECT CAST(id AS text) AS Id, CAST(session_id AS text) AS SessionId, role, content, metadata AS Metadata, created_at AS CreatedAt FROM chat_messages WHERE session_id = @sid::uuid AND deleted_at IS NULL ORDER BY created_at ASC",
             new { sid = sessionId });
         return rows.ToList();
     }
