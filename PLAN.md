@@ -48,10 +48,10 @@
 - Kiểm tra: `docker compose up -d postgres` → `pg_isready` thành công.
 
 ### 1.4 Kiểm tra điểm mốc Phase 1
-- [ ] Migration plataforma tạo đầy đủ bảng `tenants`, `documents`, `knowledge_chunks`, `ingestion_jobs`, `chat_sessions`, `chat_messages`.
-- [ ] Migration domain tuyển sinh tạo `majors`, `admission_scores`, `tuition_scholarships`, `admission_methods`.
-- [ ] Chỉ số HNSW cosine tồn tại trên `knowledge_chunks(embedding)`; B-tree `(tenant_id, document_id)`; GIN `metadata`.
-- [ ] `postgres` healthy trong docker-compose; cổng không expose ra host (trừ override dev).
+- [x] Migration plataforma tạo đầy đủ bảng `tenants`, `documents`, `knowledge_chunks`, `ingestion_jobs`, `chat_sessions`, `chat_messages`.
+- [x] Migration domain tuyển sinh tạo `majors`, `admission_scores`, `tuition_scholarships`, `admission_methods`.
+- [x] Chỉ số HNSW cosine tồn tại trên `knowledge_chunks(embedding)`; B-tree `(tenant_id, document_id)`; GIN `metadata`.
+- [x] `postgres` healthy trong docker-compose; cổng không expose ra host (trừ override dev).
 
 ---
 
@@ -115,13 +115,13 @@ Quy tắc hợp đồng:
 Xác thực service-to-service: header `X-Internal-Api-Key` (hoặc JWT nội bộ) và `X-Request-Id`. Không log key hay token.
 
 ### 2.5 Kiểm tra điểm mốc Phase 2
-- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
-- [ ] `GET /api/v1/health` và `GET /api/v1/ready` trả OK.
-- [ ] `POST /api/v1/retrieval/search` bắt buộc `tenant_id`; thiếu hoặc filter ngoài whitelist → 422.
-- [ ] `score` trong [0,1] (= 1 − distance cosine).
-- [ ] Không có kết quả → `success: true, results: []`.
-- [ ] Script seed idempotent theo `content_hash`, nạp qua pipeline ingestion.
-- [ ] Model bge-m3 được cache trong volume, không tải lại khi restart.
+- [x] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
+- [x] `GET /api/v1/health` và `GET /api/v1/ready` trả OK.
+- [x] `POST /api/v1/retrieval/search` bắt buộc `tenant_id`; thiếu hoặc filter ngoài whitelist → 422.
+- [x] `score` trong [0,1] (= 1 − distance cosine).
+- [x] Không có kết quả → `success: true, results: []`.
+- [x] Script seed idempotent theo `content_hash`, nạp qua pipeline ingestion.
+- [x] Model bge-m3 được cache trong volume, không tải lại khi restart.
 
 ---
 
@@ -169,10 +169,10 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 - `{"type":"token|citations|done|error", ...}`. **[MỚI] Thay thế định dạng `[CITATIONS]`/`[DONE]` thô.**
 
 ### 3.7 Kiểm tra điểm mốc Phase 3
-- [ ] `POST /api/chat/stream` xác thực, xác định tenant từ danh tính (không tin client gửi), lưu user message, gọi Python `/search`, guardrail, gọi LLM stream, pipe SSE real-time, lưu assistant + citations.
-- [ ] `GET /api/chat/history/{sessionId}` kiểm tra quyền sở hữu trước khi trả dữ liệu.
-- [ ] Python tắt → .NET trả lỗi thân thiện và không treo (Polly timeout / circuit breaker).
-- [ ] Dapper parameterized queries, không dùng string concat SQL.
+- [x] `POST /api/chat/stream` xác thực, xác định tenant từ danh tính (không tin client gửi), lưu user message, gọi Python `/search`, guardrail, gọi LLM stream, pipe SSE real-time, lưu assistant + citations.
+- [x] `GET /api/chat/history/{sessionId}` kiểm tra quyền sở hữu trước khi trả dữ liệu.
+- [x] Python tắt → .NET trả lỗi thân thiện và không treo (Polly timeout / circuit breaker).
+- [x] Dapper parameterized queries, không dùng string concat SQL.
 
 ---
 
@@ -206,10 +206,10 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 - **[ĐỔI]** Sửa lỗi chính tả "fuentes" → "citations".
 
 ### 4.4 Kiểm tra điểm mốc Phase 4
-- [ ] Giao diện responsive, render Markdown bảng/danh sách đúng.
-- [ ] 4 suggestion chips hiển thị trên màn hình chào mừng.
-- [ ] Streaming typing effect mượt mà, Citation Badges hiển thị dưới câu trả lời bot.
-- [ ] `docker compose up --build` chạy toàn bộ 4 service, chat end-to-end hoạt động.
+- [x] Giao diện responsive, render Markdown bảng/danh sách đúng.
+- [x] 4 suggestion chips hiển thị trên màn hình chào mừng.
+- [x] Streaming typing effect mượt mà, Citation Badges hiển thị dưới câu trả lời bot.
+- [x] `docker compose up --build` chạy toàn bộ 4 service, chat end-to-end hoạt động.
 
 ---
 
@@ -239,21 +239,21 @@ Xem `docs/api-contract-python.md`.
 
 ## Tiêu chí hoàn thành (Definition of Done)
 
-- [ ] Mọi file liệt kê trong PLAN đã được tạo theo đúng cấu trúc monorepo.
-- [ ] Tuân thủ 100% `.kilocode/rules/architecture.md`.
-- [ ] `docker compose up --build` khởi động 4 service, tất cả healthcheck pass.
+- [x] Mọi file liệt kê trong PLAN đã được tạo theo đúng cấu trúc monorepo.
+- [x] Tuân thủ 100% `.kilocode/rules/architecture.md`.
+- [x] `docker compose up --build` khởi động 4 service, tất cả healthcheck pass.
 - [ ] `start-dev.bat` / `stop-dev.bat` chạy đúng trên Windows PowerShell/CMD.
-- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
-- [ ] .NET không truy vấn bảng vector (`knowledge_chunks`); chỉ structured qua Dapper + semantic qua `/api/v1/retrieval/search`.
-- [ ] Mọi chỗ nhắc SSE dùng cùng định dạng `{"type":"token|citations|done|error"}`.
-- [ ] `tenant_id` luôn do .NET xác định từ danh tính người dùng; Python bắt buộc áp filter `tenant_id`.
-- [ ] Không còn API key hay secret plaintext trong 3 file (`PLAN.md`, `architecture.md`, `README.md`).
-- [ ] Tên service, host, cổng, đường dẫn health nhất quán giữa 3 file.
-- [ ] Luồng chat end-to-end: React gửi tin → .NET lưu → Python retrieval → .NET guardrail/prompt/LLM stream SSE → .NET lưu câu trả lời bot → hiển thị citations.
-- [ ] Python tắt → .NET trả lỗi thân thiện, không treo.
-- [ ] Guardrail từ chối cố định (do .NET, cấu hình theo tenant) hoạt động đúng khi hỏi ngoài phạm vi tuyển sinh.
-- [ ] Dữ liệu seed có sẵn qua script ingestion riêng (idempotent theo `content_hash`).
-- [ ] Hybrid search, rerank, query expansion chỉ ghi ở mức "mở rộng sau", không trong Definition of Done.
+- [x] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
+- [x] .NET không truy vấn bảng vector (`knowledge_chunks`); chỉ structured qua Dapper + semantic qua `/api/v1/retrieval/search`.
+- [x] Mọi chỗ nhắc SSE dùng cùng định dạng `{"type":"token|citations|done|error"}`.
+- [x] `tenant_id` luôn do .NET xác định từ danh tính người dùng; Python bắt buộc áp filter `tenant_id`.
+- [x] Không còn API key hay secret plaintext trong 3 file (`PLAN.md`, `architecture.md`, `README.md`).
+- [x] Tên service, host, cổng, đường dẫn health nhất quán giữa 3 file.
+- [x] Luồng chat end-to-end: React gửi tin → .NET lưu → Python retrieval → .NET guardrail/prompt/LLM stream SSE → .NET lưu câu trả lời bot → hiển thị citations.
+- [x] Python tắt → .NET trả lỗi thân thiện, không treo.
+- [x] Guardrail từ chối cố định (do .NET, cấu hình theo tenant) hoạt động đúng khi hỏi ngoài phạm vi tuyển sinh.
+- [x] Dữ liệu seed có sẵn qua script ingestion riêng (idempotent theo `content_hash`).
+- [x] Hybrid search, rerank, query expansion chỉ ghi ở mức "mở rộng sau", không trong Definition of Done.
 
 ---
 
