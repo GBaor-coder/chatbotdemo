@@ -9,8 +9,7 @@ services:
     volumes:
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql
       - pgdata:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+    # Không publish 5432 ra host trong cấu hình mặc định (chỉ qua docker-compose.override.yml profile dev)
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres -d chatbot"]
       interval: 10s
@@ -28,17 +27,10 @@ services:
       PGVECTOR_DIM: "1024"
       EMBEDDING_MODEL: BAAI/bge-m3
       EMBEDDING_DEVICE: cpu
-      LLM_BASE_URL: http://host.docker.internal:20128/v1
-      LLM_API_KEY: sk-57a432014c1cc01c-6juq1i-fe7dbfbd
-      LLM_MODEL: chatbotai
-      GATEWAY_URL: http://backend-dotnet:5000
+      X_INTERNAL_API_KEY: dev-internal-key-change-me
       LOG_LEVEL: INFO
       TRANSFORMERS_CACHE: /root/.cache/huggingface/hub
       HF_HOME: /root/.cache/huggingface
-    ports:
-      - "8000:8000"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     volumes:
       - hf-cache:/root/.cache/huggingface
     user: root
@@ -46,7 +38,7 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health')"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -56,6 +48,13 @@ services:
     environment:
       ConnectionStrings__Default: Host=db;Port=5432;Database=chatbot;Username=postgres;Password=postgres
       AI_SERVICE_URL: http://ai-service:8000
+      PYTHON_RAG_URL: http://ai-service:8000
+      X_INTERNAL_API_KEY: dev-internal-key-change-me
+      LLM_API_KEY: dev-llm-key-change-me
+      LLM_BASE_URL: http://host.docker.internal:20128/v1
+      LLM_MODEL: chatbotai
+      GUARDRAIL_REFUSAL_MESSAGE: Xin lỗi, hiện tại tôi chỉ hỗ trợ giải đáp các thông tin liên quan đến tuyển sinh của Nhà trường dựa trên dữ liệu chính thức. Bạn vui lòng đặt câu hỏi về ngành học, điểm chuẩn, học phí hoặc phương thức xét tuyển nhé!
+      DEFAULT_TENANT_ID: 11111111-1111-1111-1111-111111111111
       ASPNETCORE_URLS: http://+:5000
     ports:
       - "5000:5000"
