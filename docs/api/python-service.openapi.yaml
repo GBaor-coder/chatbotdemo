@@ -1,0 +1,375 @@
+openapi: 3.0.3
+info:
+  title: AI Service — RAG Data Service (Embedding & Retrieval)
+  version: 2.0.0
+  description: |
+    Chỉ làm dữ liệu RAG: embedding, ingestion, retrieval. Không gọi LLM, không dựng prompt,
+    không quyết định guardrail, không stream SSE. .NET là bên orchestrator.
+servers:
+  - url: http://ai-service:8000
+    description: Mạng nội bộ Docker
+  - url: http://localhost:8000
+    description: Local dev (qua docker-compose.override.yml)
+paths:
+  /api/v1/health:
+    get:
+      summary: Liveness — process sống
+      operationId: health
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+                  version:
+                    type: string
+  /api/v1/ready:
+    get:
+      summary: Readiness — chỉ OK khi model bge-m3 đã load và DB kết nối được
+      operationId: ready
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  model:
+                    type: string
+                  dim:
+                    type: integer
+        '503':
+          description: Not ready
+  /api/v1/retrieval/search:
+    post:
+      summary: Truy xuất top-k chunk vector có áp filter do .NET truyền vào
+      operationId: retrieval_search
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchRequest'
+      responses:
+        '200':
+          description: Thành công (kể cả không có kết quả)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Yêu cầu không hợp lệ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Thiếu hoặc sai X-Internal-Api-Key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Filter ngoài whitelist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Model chưa sẵn sàng hoặc DB unavailable
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Lỗi nội bộ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /ingestion/documents:
+    post:
+      summary: Tạo job ingestion bất đồng bộ (nội bộ/admin pipeline)
+      operationId: ingest_document
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IngestDocumentRequest'
+      responses:
+        '202':
+          description: Job đã tạo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IngestDocumentResponse'
+  /ingestion/jobs/{job_id}:
+    get:
+      summary: Truy vấn trạng thái job ingestion
+      operationId: get_ingestion_job
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: job_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Trạng thái job
+        '404':
+          description: Job không tìm thấy
+  /ingestion/documents/{document_id}:
+    delete:
+      summary: Xóa document và các chunk liên quan
+      operationId: delete_document
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: document_id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Đã xóa
+  /ingestion/reembed:
+    post:
+      summary: Re-embed toàn bộ chunk khi đổi embedding_version (placeholder)
+      operationId: reembed
+      security:
+        - ApiKeyAuth: []
+      responses:
+        '200':
+          description: Đã kích hoạt
+  /embed:
+    post:
+      summary: Embed một đoạn văn bản (dùng nội bộ)
+      operationId: embed_text
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                text:
+                  type: string
+      responses:
+        '200':
+          description: Vector embedding
+security:
+  - ApiKeyAuth: []
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-Internal-Api-Key
+      description: Khóa service-to-service .NET -> Python, đọc từ env, không log.
+  schemas:
+    SearchRequest:
+      type: object
+      required:
+        - query
+        - filters
+      properties:
+        query:
+          type: string
+          description: Câu hỏi cần truy xuất ngữ cảnh
+        top_k:
+          type: integer
+          default: 5
+          minimum: 1
+          maximum: 20
+          description: Số chunk trả về (mặc định 5, tối đa 20)
+        min_score:
+          type: number
+          default: 0.0
+          minimum: 0
+          maximum: 1
+          description: Ngưỡng lọc score tại Python (.NET vẫn tự kiểm lại)
+        filters:
+          type: object
+          required:
+            - tenant_id
+          properties:
+            tenant_id:
+              type: string
+              format: uuid
+              description: Bắt buộc, do .NET xác định từ danh tính người dùng
+            doc_type:
+              oneOf:
+                - type: string
+                - type: array
+                  items:
+                    type: string
+              description: Loại tài liệu (whitelist)
+            document_status:
+              type: string
+              description: Trạng thái tài liệu (ví dụ published)
+            metadata:
+              type: object
+              description: Filter metadata cấp 1 (khóa -> giá trị chuỗi)
+          additionalProperties: false
+    ChunkResult:
+      type: object
+      required:
+        - chunk_id
+        - document_id
+        - content
+        - score
+        - metadata
+      properties:
+        chunk_id:
+          type: string
+          format: uuid
+        document_id:
+          type: string
+          format: uuid
+        content:
+          type: string
+        score:
+          type: number
+          description: Cosine similarity trong [0,1] (= 1 − distance cosine)
+        metadata:
+          type: object
+          description: Cac truong title, source, doc_type, ...
+    SearchMeta:
+      type: object
+      required:
+        - embedding_model
+        - embedding_version
+        - dim
+        - embed_ms
+        - query_ms
+        - returned
+      properties:
+        embedding_model:
+          type: string
+        embedding_version:
+          type: string
+        dim:
+          type: integer
+        embed_ms:
+          type: integer
+        query_ms:
+          type: integer
+        returned:
+          type: integer
+    SearchResponse:
+      type: object
+      required:
+        - success
+        - results
+        - meta
+        - request_id
+      properties:
+        success:
+          type: boolean
+        request_id:
+          type: string
+          format: uuid
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChunkResult'
+        meta:
+          $ref: '#/components/schemas/SearchMeta'
+        timing_ms:
+          type: object
+          properties:
+            embed:
+              type: integer
+            vector:
+              type: integer
+            total:
+              type: integer
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+        - request_id
+      properties:
+        success:
+          type: boolean
+          example: false
+        request_id:
+          type: string
+          format: uuid
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - UNAUTHORIZED
+                - FILTER_NOT_ALLOWED
+                - MODEL_NOT_READY
+                - DB_UNAVAILABLE
+                - INTERNAL
+            message:
+              type: string
+    IngestDocumentRequest:
+      type: object
+      required:
+        - tenant_id
+        - source
+        - title
+        - content
+      properties:
+        tenant_id:
+          type: string
+          format: uuid
+        source:
+          type: string
+        title:
+          type: string
+        doc_type:
+          type: string
+          default: text
+        status:
+          type: string
+          default: published
+        content:
+          type: string
+        metadata:
+          type: object
+          default: null
+    IngestDocumentResponse:
+      type: object
+      required:
+        - job_id
+        - status
+        - message
+      properties:
+        job_id:
+          type: string
+          format: uuid
+        status:
+          type: string
+        message:
+          type: string

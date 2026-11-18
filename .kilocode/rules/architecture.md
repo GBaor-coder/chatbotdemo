@@ -1,4 +1,4 @@
-# KILO CODE HARNESS RULES - ADMISSIONS CHATBOT AI
+# KILO CODE HARNESS RULES - ADMISSIONS CHATBOT AI (Khuôn mẫu tái sử dụng)
 
 ## 1. Tech Stack & Strict Boundaries
 - **Frontend:** React 19 + Vite + TypeScript + TailwindCSS. Dùng `@microsoft/fetch-event-source` hoặc native `fetch` ReadableStream để consume SSE. Chỉ gọi .NET, không gọi Python, không kết nối DB.
@@ -7,11 +7,10 @@
 - **Database:** PostgreSQL 16 với extension `pgvector` (`vector(1024)`).
 - **LLM Gateway (9Router):** Kết nối bằng OpenAI-compatible SDK (`openai` package) từ **.NET** với:
   - `base_url`: `http://host.docker.internal:20128/v1` (chạy trong Docker) hoặc `http://localhost:20128/v1` (local)
-  - `api_key`: `LLM_API_KEY` đọc từ `.env` (không lưu plaintext trong repo)
-  - `model`: `chatbotai` (Primary/Fallback được cấu hình trên 9Router trỏ tới `oc/deepseek-v4.1-flash-free`)
+  - `api_key`: `${LLM_API_KEY}` đọc từ `.env` (không lưu plaintext trong repo)
+  - `model`: `chatbotai` (Primary/Fallback được cấu hình trên 9Router)
 
 ## 2. Data Flow (Phương án B — .NET Core Backend + Python RAG Service)
-12 bước retrieval:
 
 1. React 19 gửi `POST /api/chat/stream` (`sessionId?`, `message`) đến .NET 10 Backend.
 2. .NET xác thực người dùng và xác định phạm vi dữ liệu (`tenant_id`, v.v.) từ danh tính; **không tin `tenant_id`/`userId` do client gửi.**
@@ -30,7 +29,7 @@
 - Bot chỉ được trả lời về tuyển sinh dựa trên context đã truy xuất.
 - Nếu context không có câu trả lời hoặc người dùng hỏi ngoài phạm vi tuyển sinh (thời tiết, code, chuyên ngành không hỗ trợ, chính trị...), bot BẮT BUỘC trả lời:
   *"Xin lỗi, hiện tại tôi chỉ hỗ trợ giải đáp các thông tin liên quan đến tuyển sinh của Nhà trường dựa trên dữ liệu chính thức. Bạn vui lòng đặt câu hỏi về ngành học, điểm chuẩn, học phí hoặc phương thức xét tuyển nhé!"*
-- Câu từ chối thuộc về .NET, cấu hình theo tenant (không hard-code).
+- Câu từ chối thuộc về .NET, cấu hình theo tenant (không hard-code). Tên miền ("Nhà trường") cấu hình theo tenant.
 - Structured Query là luồng chính cho số liệu chính thức; Semantic Retrieval chỉ bổ trợ. Không dùng similarity search thay cho truy vấn số liệu.
 
 ## 4. Ranh giới cứng
@@ -43,7 +42,7 @@
 | Structured query (điểm chuẩn, học phí, học bổng, phương thức) qua Dapper+Npgsql | .NET | Frontend gọi Python; frontend kết nối DB |
 | Guardrail, dựng prompt, gọi LLM qua 9Router, stream SSE | .NET | Tin `tenant_id`/`userId` gửi từ client |
 
-- **API key:** `LLM_API_KEY` đọc từ `.env`, không ghi plaintext vào repo. Key cũ đã lộ trong lịch sử repo → **cần thu hồi ngay.**
+- **API key:** `${LLM_API_KEY}` đọc từ `.env`, không ghi plaintext vào repo. Key cũ đã lộ trong lịch sử repo → **cần thu hồi ngay.**
 
 ## 5. Mở rộng sau (không trong Definition of Done)
 Hybrid search, rerank, query expansion chỉ ghi ở mức ý định, không đưa vào phạm vi hiện tại. Không thêm công nghệ mới (Redis, message queue, v.v.) nếu không có trong danh sách tech stack.

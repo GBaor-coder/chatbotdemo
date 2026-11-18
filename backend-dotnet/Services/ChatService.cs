@@ -50,7 +50,7 @@ public sealed class ChatService
         if (!string.IsNullOrEmpty(sessionId))
         {
             var existing = await conn.QueryFirstOrDefaultAsync<ChatSessionDto>(
-                "SELECT id, title, tenant_id AS TenantId, user_id AS UserId, created_at AS CreatedAt, updated_at AS UpdatedAt FROM chat_sessions WHERE id = @id::uuid AND deleted_at IS NULL",
+                "SELECT CAST(id AS text) AS Id, title, CAST(tenant_id AS text) AS TenantId, CAST(user_id AS text) AS UserId, created_at AS CreatedAt, updated_at AS UpdatedAt FROM chat_sessions WHERE id = @id::uuid AND deleted_at IS NULL",
                 new { id = sessionId });
             if (existing != null) return existing.Id;
         }

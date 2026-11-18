@@ -49,13 +49,13 @@ services:
       ConnectionStrings__Default: Host=db;Port=5432;Database=chatbot;Username=postgres;Password=postgres
       AI_SERVICE_URL: http://ai-service:8000
       PYTHON_RAG_URL: http://ai-service:8000
-      X_INTERNAL_API_KEY: dev-internal-key-change-me
-      LLM_API_KEY: dev-llm-key-change-me
-      LLM_BASE_URL: http://host.docker.internal:20128/v1
-      LLM_MODEL: chatbotai
-      GUARDRAIL_REFUSAL_MESSAGE: Xin lỗi, hiện tại tôi chỉ hỗ trợ giải đáp các thông tin liên quan đến tuyển sinh của Nhà trường dựa trên dữ liệu chính thức. Bạn vui lòng đặt câu hỏi về ngành học, điểm chuẩn, học phí hoặc phương thức xét tuyển nhé!
-      GUARDRAIL_MIN_SCORE: 0.45
-      DEFAULT_TENANT_ID: 11111111-1111-1111-1111-111111111111
+      X_INTERNAL_API_KEY: ${X_INTERNAL_API_KEY}
+      LLM_API_KEY: ${LLM_API_KEY}
+      LLM_BASE_URL: ${LLM_BASE_URL}
+      LLM_MODEL: ${LLM_MODEL}
+      GUARDRAIL_REFUSAL_MESSAGE: ${GUARDRAIL_REFUSAL_MESSAGE}
+      GUARDRAIL_MIN_SCORE: ${GUARDRAIL_MIN_SCORE}
+      DEFAULT_TENANT_ID: ${DEFAULT_TENANT_ID}
       ASPNETCORE_URLS: http://+:5000
     ports:
       - "5000:5000"

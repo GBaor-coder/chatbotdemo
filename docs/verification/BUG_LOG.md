@@ -1,0 +1,5 @@
+# BUG_LOG.md — Nhật ký lỗi và cách sửa
+
+| ID | Triệu chứng | Nguyên nhân gốc | Cách sửa | Kiểm tra hồi quy | Bằng chứng | Trạng thái |
+|---|---|---|---|---|---|---|
+| BUG-07 | `POST /api/chat/stream` trả HTTP 500 `InternalCastException: Object must implement IConvertible` khi Dapper deserialize cột `id` (UUID) từ PostgreSQL sang `string` (`ChatSessionDto.Id`). | `EnsureSessionAsync`SELECT cột `id`, `tenant_id`, `user_id` (loại UUID) mà không `CAST(... AS text)`, Dapper/Npgsql trả về `Guid` và không convert sang `string` được. `GetHistoryAsync` đã cast đúng, `EnsureSessionAsync` chưa. | Thêm `CAST(id AS text) AS Id`, `CAST(tenant_id AS text) AS TenantId`, `CAST(user_id AS text) AS UserId` trong SELECT của `EnsureSessionAsync` (`backend-dotnet/Services/ChatService.cs`). | `POST /api/chat/stream` qua `backend-dotnet:5000` và qua `frontend-react:5173` (proxy Nginx) đều trả HTTP 200, có event `token|citations|done`. | Lỗi log tại container `backend-dotnet` stack trace trỏ `ChatService.EnsureSessionAsync` dòng 52 → `Dapper.SqlMapper.QueryRowAsync<ChatSessionDto>`. Sau sửa: gọi stream trực tiếp và qua proxy đều 200. | Đã sửa |

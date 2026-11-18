@@ -1,0 +1,20 @@
+﻿{ "question": "Điểm chuẩn ngành Công nghệ thông tin 2024", "expect": ["Công nghệ thông tin","26.0"], "cat": "admission_scores" }
+{ "question": "Học phí ngành Kinh doanh", "expect": ["Kinh doanh","32 triệu"], "cat": "tuition" }
+{ "question": "Phương thức xét tuyển", "expect": ["THPTQG","học bạ"], "cat": "admission_methods" }
+{ "question": "Lịch trình tuyển sinh 2026", "expect": ["tháng 5-6","tháng 8-9"], "cat": "schedule" }
+{ "question": "Danh sách ngành tuyển sinh 2026", "expect": ["Công nghệ thông tin","Kinh doanh"], "cat": "majors" }
+{ "question": "Điểm chuẩn Khoa học máy tính 2025", "expect": ["Khoa học máy tính","26.0"], "cat": "admission_scores" }
+{ "question": "Học phí An toàn thông tin", "expect": ["An toàn thông tin","40 triệu"], "cat": "tuition" }
+{ "question": "Học bổng Công nghệ thông tin", "expect": ["học bổng","CNTT01"], "cat": "tuition" }
+{ "question": "Ngành Ngôn ngữ Anh điểm chuẩn", "expect": ["Ngôn ngữ Anh","18.5"], "cat": "admission_scores" }
+{ "question": "Quota ngành Kỹ thuật phần mềm", "expect": ["Kỹ thuật phần mềm","160"], "cat": "majors" }
+{ "question": "Điểm chuẩn Kinh tế 2023", "expect": ["Kinh tế","18.0"], "cat": "admission_scores" }
+{ "question": "Học phí Ngôn ngữ Nhật Bản", "expect": ["Ngôn ngữ Nhật Bản","24 triệu"], "cat": "tuition" }
+{ "question": "Phương thức Cơ sở hỗn hợp", "expect": ["Cơ sở hỗn hợp"], "cat": "admission_methods" }
+{ "question": "Lịch thi THPTQG 2026", "expect": ["tháng 6/2026"], "cat": "schedule" }
+{ "question": "Ngành Hệ thống thông tin", "expect": ["Hệ thống thông tin"], "cat": "majors" }
+{ "question": "Điểm chuẩn Truyền thông đa phương tiện 2024", "expect": ["Truyền thông đa phương tiện","19.0"], "cat": "admission_scores" }
+{ "question": "Học bổng Tài chính ngân hàng", "expect": ["Tài chính ngân hàng","học bổng"], "cat": "tuition" }
+{ "question": "Ngôn ngữ Hàn Quốc quota", "expect": ["Ngôn ngữ Hàn Quốc","60"], "cat": "majors" }
+{ "question": "Điểm chuẩn Kế toán 2025", "expect": ["Kế toán","20.5"], "cat": "admission_scores" }
+{ "question": "Học phí Quảng cáo", "expect": ["Quảng cáo","28 triệu"], "cat": "tuition" }
