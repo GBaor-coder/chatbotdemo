@@ -9,9 +9,9 @@ public sealed class Guardrail : IGuardrail
 
     public Guardrail(IConfiguration config)
     {
-        // Câu từ chối từ cấu hình theo tenant (không hard-code)
+        // Câu từ chối phải được cấu hình (không hard-code). Thiếu cấu hình → fail fast khi khởi động.
         _refusalMessage = config["GUARDRAIL_REFUSAL_MESSAGE"]
-            ?? "Xin lỗi, hiện tại tôi chỉ hỗ trợ giải đáp các thông tin liên quan đến tuyển sinh của Nhà trường dựa trên dữ liệu chính thức. Bạn vui lòng đặt câu hỏi về ngành học, điểm chuẩn, học phí hoặc phương thức xét tuyển nhé!";
+            ?? throw new InvalidOperationException("GUARDRAIL_REFUSAL_MESSAGE chưa được cấu hình.");
         _minScore = double.TryParse(config["GUARDRAIL_MIN_SCORE"], out var ms) ? ms : 0.45;
     }
 
