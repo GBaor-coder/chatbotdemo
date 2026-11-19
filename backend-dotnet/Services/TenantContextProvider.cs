@@ -1,10 +1,11 @@
 using BackendDotnet.Models;
 using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 
 namespace BackendDotnet.Services;
 
-// [GIẢ ĐỊNH] Dev-only: lấy tenant_id / user_id từ header authentication.
-// Trong production, thay bằng việc đọc từ JWT claim sau khi xác thực thực tế.
+// Xác thực qua JWT (access_token đọc từ query string cho /hubs/chat qua JwtBearerEvents.OnMessageReceived).
+// tenant_id / userId lấy từ claims của Context.User, KHÔNG tin payload do client gửi.
 public sealed class TenantContextProvider : ITenantContext
 {
     private readonly IHttpContextAccessor _http;
@@ -18,8 +19,8 @@ public sealed class TenantContextProvider : ITenantContext
 
     public TenantContext GetContext()
     {
-        var ctx = _http.HttpContext;
-        if (ctx == null)
+        var user = _http.HttpContext?.User;
+        if (user == null || !user.Identity?.IsAuthenticated == true)
         {
             return new TenantContext
             {
@@ -29,24 +30,13 @@ public sealed class TenantContextProvider : ITenantContext
             };
         }
 
-        var authHeader = ctx.Request.Headers["Authorization"].FirstOrDefault();
-        var xTenantId = ctx.Request.Headers["X-Tenant-Id"].FirstOrDefault();
-
-        // [GIẢ ĐỊNH] Dev auth: Yêu cầu Authorization header (hoặc X-Tenant-Id) để xác thực.
-        // Nếu không có cả hai -> coi như unauthenticated (trả TenantId rỗng để controller trả 401).
-        if (string.IsNullOrEmpty(authHeader) && string.IsNullOrEmpty(xTenantId))
-        {
-            return new TenantContext
-            {
-                TenantId = string.Empty,
-                UserId = string.Empty,
-                OrganizationIds = Array.Empty<string>(),
-            };
-        }
-
-        var tenantId = xTenantId
-            ?? _config["DEFAULT_TENANT_ID"] ?? "11111111-1111-1111-1111-111111111111";
-        var userId = ctx.Request.Headers["X-User-Id"].FirstOrDefault() ?? "authenticated-user";
+        var tenantId = user.FindFirst("tenant_id")?.Value
+            ?? user.FindFirst("tid")?.Value
+            ?? string.Empty;
+        var userId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? user.FindFirst("sub")?.Value
+            ?? user.FindFirst(ClaimTypes.Name)?.Value
+            ?? string.Empty;
 
         return new TenantContext
         {

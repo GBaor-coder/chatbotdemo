@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
-import { useChatStream } from "@/hooks/useChatStream";
+import { useChatConnection } from "@/hooks/useChatConnection";
 import ChatWindow from "@/components/ChatWindow";
 import SuggestionChips from "@/components/SuggestionChips";
-import { Send, Menu, X } from "lucide-react";
+import { Send, Menu, X, StopCircle } from "lucide-react";
 
 const SUGGESTIONS: { id: string; question: string }[] = [
   { id: "s1", question: "Điểm chuẩn ngành Công nghệ thông tin 2024 là bao nhiêu?" },
@@ -14,8 +14,8 @@ const SUGGESTIONS: { id: string; question: string }[] = [
 export default function App() {
   const [input, setInput] = useState("");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const { messages, isStreaming, sendMessage } = useChatStream();
-
+  const { messages, isStreaming, sendMessage, stopStream, streamError } =
+    useChatConnection();
   useEffect(() => {
     setSidebarOpen(typeof window !== "undefined" && window.innerWidth >= 768);
   }, []);
@@ -70,6 +70,11 @@ export default function App() {
       )}
 
       <main className="flex-1 flex flex-col md:ml-0 md:max-w-4xl md:mx-auto w-full">
+        {streamError && (
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-sm mb-2">
+            {streamError}
+          </div>
+        )}
         <button
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="md:hidden p-3 text-muted-foreground hover:text-foreground"
@@ -91,8 +96,26 @@ export default function App() {
               disabled={isStreaming || !input.trim()}
               className="px-6 py-3 bg-primary text-primary-foreground rounded-lg font-medium disabled:opacity-50 hover:opacity-90 transition-all flex items-center gap-2 shadow-sm focus:ring-2 focus:ring-ring focus:ring-offset-2"
             >
-              <Send className="w-4 h-4" /> Gửi
+              {isStreaming ? (
+                <span className="flex items-center gap-2 animate-pulse">
+                  <Send className="w-4 h-4" /> Đang trả lời…
+                </span>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" /> Gửi
+                </>
+              )}
             </button>
+            {isStreaming && (
+              <button
+                type="button"
+                onClick={stopStream}
+                className="ml-2 px-3 py-3 bg-destructive text-destructive-foreground rounded-lg font-medium hover:bg-destructive/90 transition-colors flex items-center gap-1"
+                title="Dừng stream"
+              >
+                <StopCircle className="w-4 h-4" /> Dừng
+              </button>
+            )}
           </div>
         </form>
       </main>

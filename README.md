@@ -2,7 +2,7 @@
 
 4 services: PostgreSQL 16 + pgvector, ai-service (Python FastAPI RAG Data Service: bge-m3 1024 chiều, ingestion, retrieval), backend-dotnet (.NET 10/Dapper Gateway & Orchestration), frontend-react (React 19/Vite/Tailwind).
 
-Python là dịch vụ nền tảng (embedding, ingestion, retrieval) không biết gì về nghiệp vụ. .NET giữ toàn bộ nghiệp vụ (xác thực, phân quyền, tenant scope, session, lịch sử, truy vấn có cấu trúc, guardrail, prompt, gọi LLM, stream SSE, citations).
+Python là dịch vụ nền tảng (embedding, ingestion, retrieval) không biết gì về nghiệp vụ. .NET giữ toàn bộ nghiệp vụ (xác thực, phân quyền, tenant scope, session, lịch sử, truy vấn có cấu trúc, guardrail, prompt, gọi LLM, stream realtime qua SignalR, citations).
 
 ## Quick Start
 ```bash
@@ -19,7 +19,7 @@ docker compose up --build
 
 ## Kiểm tra
 1. Mở frontend, gõ "Điểm chuẩn 2024".
-2. Xem stream SSE từ gateway theo chuẩn `{"type":"token|citations|done|error"}`.
+2. Xem stream realtime từ gateway qua SignalR theo chuẩn `{"type":"token|citations|done|error"}`.
 3. Seed data: nạp qua script ingestion riêng (`scripts/seed.py`), idempotent theo `content_hash`, không tự sinh trong code Python.
 
 ## Cấu trúc
