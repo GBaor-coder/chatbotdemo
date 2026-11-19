@@ -1,8 +1,8 @@
 # PLAN.md — Khuôn mẫu tái sử dụng Chatbot AI (domain tuyển sinh là bản mẫu đầu tiên)
 
-**Mục tiêu:** Xây dựng nền tảng chatbot AI có thể gắn vào nhiều hệ thống thực tế, mỗi hệ thống có backend .NET và nghiệp vụ riêng. Python là dịch vụ nền tảng (embedding, ingestion, retrieval) không biết gì về nghiệp vụ. .NET giữ toàn bộ nghiệp vụ (xác thực, phân quyền, tenant scope, session, lịch sử, truy vấn có cấu trúc, guardrail, prompt, gọi LLM, stream SSE, citations). Chạy toàn bộ stack bằng lệnh duy nhất `docker compose up --build`.
+**Mục tiêu:** Xây dựng nền tảng chatbot AI có thể gắn vào nhiều hệ thống thực tế, mỗi hệ thống có backend .NET và nghiệp vụ riêng. Python là dịch vụ nền tảng (embedding, ingestion, retrieval) không biết gì về nghiệp vụ. .NET giữ toàn bộ nghiệp vụ (xác thực, phân quyền, tenant scope, session, lịch sử, truy vấn có cấu trúc, guardrail, prompt, gọi LLM, stream realtime qua SignalR, citations). Chạy toàn bộ stack bằng lệnh duy nhất `docker compose up --build`.
 
-**Kiến trúc:** Phương án B — Monorepo: PostgreSQL 16 + pgvector (DB), Python FastAPI (RAG Data Service: bge-m3 1024 chiều, ingestion, retrieval), ASP.NET Core .NET 10 (Gateway & Orchestration: xác thực, phân quyền, structured query Dapper+Npgsql, guardrail, prompt, gọi LLM qua 9Router, stream SSE), React 19 + Vite + TypeScript + TailwindCSS (frontend, chỉ gọi .NET).
+**Kiến trúc:** Phương án B — Monorepo: PostgreSQL 16 + pgvector (DB), Python FastAPI (RAG Data Service: bge-m3 1024 chiều, ingestion, retrieval), ASP.NET Core .NET 10 (Gateway & Orchestration: xác thực, phân quyền, structured query Dapper+Npgsql, guardrail, prompt, gọi LLM qua 9Router, stream realtime qua SignalR), React 19 + Vite + TypeScript + TailwindCSS (frontend, chỉ gọi .NET).
 
 **Luật bắt buộc:** Tuân thủ nghiêm ngặt `.kilocode/rules/architecture.md` (tech stack, data flow, ranh giới cứng, guardrails anti-hallucination).
 
@@ -58,7 +58,7 @@
 
 ## Phase 2: Python "Embedding & Retrieval Service" (FastAPI + bge-m3)
 
-**Mục tiêu:** Xây dựng service AI chịu trách nhiệm embedding, ingestion, tìm kiếm vector. **[ĐỔI] Python KHÔNG gọi LLM, KHÔNG dựng prompt, KHÔNG quyết định guardrail, KHÔNG stream SSE.**
+**Mục tiêu:** Xây dựng service AI chịu trách nhiệm embedding, ingestion, tìm kiếm vector. **[ĐỔI] Python KHÔNG gọi LLM, KHÔNG dựng prompt, KHÔNG quyết định guardrail, KHÔNG stream realtime.**
 
 ### 2.1 Cấu hình ai-service (RAG Data Service)
 - Image base: `python:3.12-slim`.
@@ -120,7 +120,7 @@ Quy tắc hợp đồng:
 Xác thực service-to-service: header `X-Internal-Api-Key` (hoặc JWT nội bộ) và `X-Request-Id`. Không log key hay token.
 
 ### 2.5 Kiểm tra điểm mốc Phase 2
-- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
+- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream realtime.
 - [ ] `GET /api/v1/health` và `GET /api/v1/ready` trả OK.
 - [ ] `POST /api/v1/retrieval/search` bắt buộc `tenant_id`; thiếu hoặc filter ngoài whitelist → 422.
 - [ ] `score` trong [0,1] (= 1 − distance cosine).
@@ -132,12 +132,13 @@ Xác thực service-to-service: header `X-Internal-Api-Key` (hoặc JWT nội b�
 
 ## Phase 3: .NET 10 Gateway & Orchestration (ASP.NET Core Web API + Dapper)
 
-**Mục tiêu:** Xây dựng gateway chịu trách nhiệm xác thực, phân quyền, tenant scope, điều phối luồng chat, guardrail, prompt, gọi LLM qua 9Router, stream SSE về React, lưu message và citations.
+**Mục tiêu:** Xây dựng gateway chịu trách nhiệm xác thực, phân quyền, tenant scope, điều phối luồng chat, guardrail, prompt, gọi LLM qua 9Router, stream realtime qua SignalR về React, lưu message và citations.
 
 ### 3.1 Cấu hình backend-dotnet
 - Target framework: `net10.0`.
 - Packages: `Dapper`, `Npgsql`, `Microsoft.Extensions.Http.Polly`.
 - Môi trường: `ConnectionStrings__Default` (Host=db;...), `PYTHON_RAG_URL=http://ai-service:8000`, `LLM_API_KEY` (đọc từ `.env`, dùng cho 9Router), `ASPNETCORE_URLS=http://+:5000`.
+- Ngưỡng: `GUARDRAIL_MIN_SCORE` (ngưỡng guardrail, mặc định 0.45) và `RETRIEVAL_MIN_SCORE` (ngưỡng lọc retrieval gọi Python, mặc định 0.3).
 - Port expose: `5000:5000`.
 - Healthcheck: `GET /health`.
 - Không dùng Entity Framework Core; tất cả truy vấn qua Dapper + Npgsql parameterized (tránh SQL injection).
@@ -148,20 +149,25 @@ Xác thực service-to-service: header `X-Internal-Api-Key` (hoặc JWT nội b�
 - `IGuardrail`, `IPromptBuilder`, `IStructuredQueryService`.
 - Domain tuyển sinh là một implementation cắm vào abstractions này; thêm hệ thống mới không đụng Python.
 
-### 3.3 Endpoint `POST /api/chat/stream`
-Input: `{ sessionId?, message }`. **[ĐỔI] Bỏ `userId` do client gửi.**
+### 3.3 Hub `ChatHub` tại `/hubs/chat` (thay thế kênh SSE trước đó)
+Method server→client: `StreamChat(StreamChatRequest request)` → `IAsyncEnumerable<ChatEvent>`. Input `StreamChatRequest` chỉ có `sessionId?` và `message`; **không có `tenantId`/`userId`**.
 
-Luồng xử lý:
-1. Xác thực và xác định phạm vi dữ liệu từ danh tính người dùng (`tenant_id`, `organization_ids`...). **Không tin `tenant_id` hay `userId` do client gửi.**
-2. Tạo hoặc kiểm tra quyền sở hữu session, lưu tin nhắn người dùng vào `chat_messages` (role=`user`) qua Dapper.
-3. Structured query trước (nếu câu hỏi là số liệu: điểm chuẩn, học phí, học bổng, lịch tuyển sinh), semantic `/api/v1/retrieval-search` bổ trợ.
-4. Guardrail: nếu không có chunk nào vượt ngưỡng `min_score` và không có kết quả structured, trả câu từ chối cố định, **không gọi LLM**.
-5. Dựng prompt, gọi LLM stream qua 9Router, pipe SSE về React (`CancellationToken` khi client ngắt kết nối).
-6. Lưu tin nhắn assistant hoàn chỉnh + citations.
+Luồng xử lý (trong `IChatOrchestrator`, hub mỏng):
+1. Hub lấy `tenant_id`/`userId` từ `Context.User` (claims JWT), gọi orchestrator rồi yield `ChatEvent`.
+2. Xác thực và xác định phạm vi dữ liệu từ danh tính người dùng (`tenant_id`, `organization_ids`...). **Không tin `tenant_id` hay `userId` do client gửi.**
+3. Tạo hoặc kiểm tra quyền sở hữu session, lưu tin nhắn người dùng vào `chat_messages` (role=`user`) qua Dapper.
+4. Structured query trước (nếu câu hỏi là số liệu: điểm chuẩn, học phí, học bổng, lịch tuyển sinh), semantic `/api/v1/retrieval-search` bổ trợ.
+5. Guardrail: nếu không có chunk nào vượt `GUARDRAIL_MIN_SCORE` (mặc định 0.45) và không có kết quả structured, trả câu từ chối cố định, **không gọi LLM**. Retrieval được gọi với `RETRIEVAL_MIN_SCORE` (mặc định 0.3, lưới rộng để thu thập ứng viên); guardrail dùng `GUARDRAIL_MIN_SCORE` (mặc định 0.45, ngặt để quyết định từ chối). Hai ngưỡng này có ý nghĩa riêng và không được hard-code.
+6. Dựng prompt, gọi LLM stream qua 9Router, yield `ChatEvent` qua hub (`CancellationToken` khi client ngắt/hủy kết nối).
+7. Lưu tin nhắn assistant hoàn chỉnh + citations chỉ khi stream hoàn tất.
+
+> Giới hạn 1 stream/session được thi đính trong bộ nhớ của một instance backend-dotnet (không dùng Redis backplane). Khi chạy nhiều instance backend-dotnet, giới hạn này chỉ đúng trong mỗi instance; cần backplane/khóa phân tán để thi đính toàn cục (xem mục Mở rộng sau).
 
 Prompt, câu từ chối, `top_k`, `min_score` nằm trong **cấu hình theo tenant**, không hard-code.
 
 Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python và LLM.
+
+Xác thực: JWT, `access_token` đọc từ query string chỉ cho `/hubs/chat` (`JwtBearerEvents.OnMessageReceived`). Hub gắn `[Authorize]`. `EnableDetailedErrors = false` ngoài môi trường dev.
 
 ### 3.4 Endpoint `GET /api/chat/history/{sessionId}`
 - Truy xuất danh sách `chat_messages` của phiên, sắp xếp theo `created_at` ASC.
@@ -170,11 +176,11 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 ### 3.5 Endpoint `GET /api/suggestions`
 - Giữ nguyên: trả về 4 câu hỏi gợi ý mẫu cố định.
 
-### 3.6 Chuẩn SSE duy nhất
-- `{"type":"token|citations|done|error", ...}`. **[MỚI] Thay thế định dạng `[CITATIONS]`/`[DONE]` thô.**
+### 3.6 Chuẩn sự kiện realtime qua SignalR
+- `{"type":"token|citations|done|error", ...}`. Giao ước sự kiện giữ nguyên so với chuẩn trước đó; chỉ khác kênh truyền tải (SignalR thay vì `text/event-stream`).
 
 ### 3.7 Kiểm tra điểm mốc Phase 3
-- [ ] `POST /api/chat/stream` xác thực, xác định tenant từ danh tính (không tin client gửi), lưu user message, gọi Python `/search`, guardrail, gọi LLM stream, pipe SSE real-time, lưu assistant + citations.
+- [ ] `ChatHub.StreamChat` qua SignalR xác thực, xác định tenant từ danh tính (không tin client gửi), lưu user message, gọi Python `/search`, guardrail, gọi LLM stream, yield `ChatEvent` real-time, lưu assistant + citations.
 - [ ] `GET /api/chat/history/{sessionId}` kiểm tra quyền sở hữu trước khi trả dữ liệu.
 - [ ] Python tắt → .NET trả lỗi thân thiện và không treo (Polly timeout / circuit breaker).
 - [ ] Dapper parameterized queries, không dùng string concat SQL.
@@ -183,7 +189,7 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 
 ## Phase 4: React 19 UI (Vite + TypeScript + TailwindCSS)
 
-**Mục tiêu:** Giữ giao diện và hook `useChatStream`; chỉ đồng bộ với chuẩn SSE đã thống nhất.
+**Mục tiêu:** Giữ giao diện và hook `useChatConnection`; chỉ đồng bộ với chuẩn realtime qua SignalR đã thống nhất.
 
 ### 4.1 Cấu hình frontend-react
 - Build tool: Vite.
@@ -204,17 +210,18 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 - **CitationBadges:** Hiển thị thẻ nguồn trích dẫn (`Nguồn 1: Tên chunk — score`) dưới mỗi câu trả lời của bot.
 - **Input form:** Ô nhập liệu, nút Gửi, disable khi đang stream.
 
-### 4.3 Hook `useChatStream`
-- Sử dụng native `fetch` ReadableStream hoặc `@microsoft/fetch-event-source` để consume SSE từ `/api/chat/stream`.
-- Quản lý trạng thái: `messages[]`, `isStreaming`, `currentSessionId`.
-- Xử lý sự kiện SSE: `token` → cập nhật nội dung đang gõ; `citations` → gắn trích dẫn; `done` → kết thúc stream và lưu sessionId; `error` → hiển thị thông báo lỗi.
-- **[ĐỔI]** Sửa lỗi chính tả "fuentes" → "citations".
+### 4.3 Hook `useChatConnection` (SignalR)
+- Sử dụng `@microsoft/signalr` (`HubConnection`) để kết nối `/hubs/chat` và gọi `connection.stream<ChatEvent>("StreamChat", { sessionId, message })`.
+- Quản lý trạng thái: `messages[]`, `isStreaming`, `currentSessionId`, `subscription` (dùng để `dispose()` khi nút Dừng).
+- Xử lý sự kiện SignalR: `token` → cập nhật nội dung đang gõ; `citations` → gắn trích dẫn; `done` → kết thúc stream và lưu sessionId; `error` → hiển thị thông báo lỗi.
+- Nút Dừng gọi `subscription.dispose()`; stream bị đứt kết nối thì không resume, hiển thị lỗi và nút gửi lại.
+- `accessTokenFactory` lấy token JWT; `withAutomaticReconnect`; log level theo môi trường.
 
 ### 4.4 Kiểm tra điểm mốc Phase 4
 - [ ] Giao diện responsive, render Markdown bảng/danh sách đúng.
 - [ ] 4 suggestion chips hiển thị trên màn hình chào mừng.
 - [ ] Streaming typing effect mượt mà, Citation Badges hiển thị dưới câu trả lời bot.
-- [ ] `docker compose up --build` chạy toàn bộ 4 service, chat end-to-end hoạt động.
+- [ ] `docker compose up --build` chạy toàn bộ 4 service, chat end-to-end qua SignalR hoạt động.
 
 ---
 
@@ -235,18 +242,18 @@ Polly: timeout, retry có giới hạn, circuit breaker cho lời gọi Python v
 - Nạp tài liệu mẫu qua `/ingest`, chạy bộ câu hỏi vàng `docs/verification/golden.jsonl` (≥ 20 câu có chunk/nguồn kỳ vọng) trên dữ liệu thật. Đo recall@5 và phân bố score cho câu trong phạm vi so với ngoài phạm vi. Ngưỡng `min_score` phải hiệu chỉnh từ số đo này, không đoán.
 
 ### 5.5 L4 E2E LLM thật
-- `POST /api/chat/stream` qua .NET: có token, citations, done, lưu đủ 2 message. Câu số liệu lấy từ bảng có cấu trúc và số liệu trong câu trả lời khớp DB.
+- Luồng chat qua SignalR Hub `/hubs/chat` (`StreamChat`, sự kiện `token|citations|done|error`): có token, citations, done, lưu đủ 2 message. Kiểm tra qua `tests/e2e/tests/api/chat.test.ts` (`@microsoft/signalr`, chạy khi stack đã khởi động). Câu số liệu lấy từ bảng có cấu trúc và số liệu trong câu trả lời khớp DB.
 
 ### 5.6 L5 Guardrail
 - Câu ngoài phạm vi (thời tiết, code, chính trị, ngành không có) → đúng câu từ chối cố định, và log cho thấy không có lời gọi LLM. Mỗi case chạy 3 lần.
 
 ### 5.7 L6 Bảo mật & vận hành
-- Cổng 8000 không truy cập được từ ngoài mạng Docker. Gọi Python không key → 401. User A đọc history của session user B → bị từ chối. Ngắt client giữa stream → .NET hủy lời gọi LLM, không lưu message dở. Tắt Python → .NET trả lỗi SSE error rõ ràng, không treo. `X-Request-ID` xuất hiện trong log cả 3 service.
+- Cổng 8000 không truy cập được từ ngoài mạng Docker. Gọi Python không key → 401. User A đọc history của session user B → bị từ chối. Ngắt client giữa stream → .NET hủy lời gọi LLM, không lưu message dở. Tắt Python → .NET trả lỗi qua SignalR rõ ràng, không treo. `X-Request-ID` xuất hiện trong log cả 3 service.
 
 ### 5.8 Đối chiếu tự động tài liệu ↔ code (`scripts/check-consistency`)
 - Endpoint trong PLAN/README/architecture so với route thực tế (OpenAPI của FastAPI và route .NET).
 - Tên biến môi trường trong docker-compose.yml, `.env.example`, code và README.
-- Hình dạng sự kiện SSE: bên phát (.NET), bên đọc (hook React), bên tài liệu phải trùng nhau.
+- Hình dạng sự kiện realtime: bên phát (.NET), bên đọc (hook React), bên tài liệu phải trùng nhau.
 - Mọi câu truy vấn Dapper chạy được trên schema thật (chạy thật, không đoán).
 - Cổng và hostname trong compose khớp với connection string.
 - Checkbox trong PLAN chỉ được tích khi có dòng bằng chứng tương ứng trong `docs/verification/`.
@@ -290,18 +297,18 @@ Xem `docs/api-contract-python.md` (sinh từ OpenAPI của FastAPI, không viế
 
 ## Tiêu chí hoàn thành (Definition of Done)
 
-- [ ] Bộ tài liệu đã cập nhật, không còn mâu thuẫn (SSE, health, host DB, seed), không còn key plaintext, đã có `.env.example`.
+- [ ] Bộ tài liệu đã cập nhật, không còn mâu thuẫn (realtime, health, host DB, seed), không còn key plaintext, đã có `.env.example`.
 - [ ] Python chỉ còn `/search`, `/ingest`, `/embed`, `/health`, `/ready`; không còn đường gọi LLM nào trong `ai-service`.
-- [ ] .NET đảm nhiệm prompt, guardrail, gọi LLM, phát SSE, lưu lịch sử; React không phải sửa (hoặc đã được cho phép sửa).
+- [ ] .NET đảm nhiệm prompt, guardrail, gọi LLM, phát realtime qua SignalR, lưu lịch sử; React không phải sửa (hoặc đã được cho phép sửa).
 - [ ] `docker compose up --build` khởi động 4 service, mọi healthcheck pass.
 - [ ] `start-dev.bat` / `stop-dev.bat` chạy đúng trên Windows PowerShell/CMD.
-- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream SSE.
+- [ ] Python không còn import `openai`; không gọi LLM, không dựng prompt, không stream realtime.
 - [ ] .NET không truy vấn bảng vector (`knowledge_chunks`); chỉ structured qua Dapper + semantic qua `/api/v1/retrieval-search`.
-- [ ] Mọi chỗ nhắc SSE dùng cùng định dạng `{"type":"token|citations|done|error"}`.
+- [ ] Mọi chỗ nhắc realtime dùng cùng định dạng `{"type":"token|citations|done|error"}` qua SignalR; không còn endpoint SSE.
 - [ ] `tenant_id` luôn do .NET xác định từ danh tính người dùng; Python bắt buộc áp filter `tenant_id`.
 - [ ] Không còn API key hay secret plaintext trong 3 file (`PLAN.md`, `architecture.md`, `README.md`).
 - [ ] Tên service, host, cổng, đường dẫn health nhất quán giữa 3 file.
-- [ ] Luồng chat end-to-end: React gửi tin → .NET lưu → Python retrieval → .NET guardrail/prompt/LLM stream SSE → .NET lưu câu trả lời bot → hiển thị citations.
+- [ ] Luồng chat end-to-end: React gửi tin → .NET lưu → Python retrieval → .NET guardrail/prompt/LLM stream qua SignalR → .NET lưu câu trả lời bot → hiển thị citations.
 - [ ] Python tắt → .NET trả lỗi thân thiện, không treo.
 - [ ] Guardrail từ chối cố định (do .NET, cấu hình theo tenant) hoạt động đúng khi hỏi ngoài phạm vi tuyển sinh.
 - [ ] Dữ liệu seed có sẵn qua script ingestion riêng (idempotent theo `content_hash`).
